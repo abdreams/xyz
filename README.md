@@ -1,123 +1,214 @@
-Approaching the portfolio optimization problem involves several key steps that blend finance concepts with machine learning and statistical methods. Below is a step-by-step guide to help you tackle this problem as a beginner in finance and machine learning:
+There are a few issues in your code that might be causing the table to not display any data. Here are the steps to fix the errors:
 
-### Step 1: Understand the Basics
+1. **Change `allUsers` to `data` in `useTable` Hook:** The `useTable` hook expects the `data` property instead of `allUsers`.
 
-1. **Modern Portfolio Theory (MPT):** Learn the basics of MPT, which aims to maximize return for a given level of risk through diversification.
-2. **Risk and Return Metrics:** Understand how to calculate expected return, variance, and covariance of asset returns.
+2. **Replace duplicate user IDs in initial data:** The initial data contains duplicate `userid` values. Each user should have a unique `userid`.
 
-### Step 2: Collect and Preprocess Data
+3. **Fix the display issue for sorted icons:** The sorted icons are using special characters that might not render properly. Use simpler text or icons.
 
-1. **Asset Selection:**
-   - Choose a set of assets (e.g., stocks, bonds).
-   - Ensure you have historical price data for each asset.
+4. **Ensure that data is being correctly fetched:** Ensure that the `allUsers` state is correctly populated from the API.
 
-2. **Data Sources:**
-   - Use financial APIs (like Yahoo Finance, Alpha Vantage) or financial databases to get historical price data and financial metrics (P/E ratio, market cap, etc.).
+Here's the corrected version of your code:
 
-3. **Preprocessing:**
-   - Clean the data (handle missing values, outliers).
-   - Calculate daily returns from historical price data.
-   - Normalize or standardize the data if needed.
+```javascript
+import React, { useEffect, useState } from 'react';
+import { useTable, useSortBy, useGlobalFilter } from 'react-table';
+import { useNavigate } from 'react-router-dom';
+import EditUserModal from '../components/EditUserModal';
 
-### Step 3: Develop a Risk Model
+const GlobalFilter = ({ globalFilter, setGlobalFilter }) => {
+  return (
+    <span>
+      Search:{' '}
+      <input
+        value={globalFilter || ''}
+        onChange={e => setGlobalFilter(e.target.value || undefined)}
+        placeholder="Search by name"
+        className="p-2 mb-4 border border-gray-300 rounded-lg"
+      />
+    </span>
+  );
+};
 
-1. **Volatility:**
-   - Compute the standard deviation of daily returns for each asset to measure volatility.
+const Users = () => {
+  const [allUsers, setAllUsers] = useState([]);
+  const navigate = useNavigate();
 
-2. **Correlation:**
-   - Calculate the correlation matrix of asset returns to understand how they move relative to each other.
+  useEffect(() => {
+    const userData = async () => {
+      try {
+        const res = await fetch(`${import.meta.env?.VITE_BACKEND_URL}/admin/users`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'accesstoken': sessionStorage.getItem('accessToken')
+          }
+        });
+        const d = await res.json();
+        setAllUsers(d);
+      } catch (error) {
+        alert("error while admin users");
+        console.log(error);
+      }
+    };
 
-### Step 4: Define the Objective Function
+    userData();
+  }, []);
 
-1. **Expected Return:**
-   - Compute the mean of the asset returns.
+  const initialData = React.useMemo(
+    () => [
+      {
+        userid: 1,
+        name: 'John Doe',
+        email: 'john.doe@example.com',
+        dob: '1980-01-01',
+        invested: 50000,
+        worth: 70000,
+        profitLoss: 20000,
+        nop: 3
+      },
+      {
+        userid: 2,
+        name: 'Jane Doe',
+        email: 'jane.doe@example.com',
+        dob: '1985-01-01',
+        invested: 60000,
+        worth: 80000,
+        profitLoss: 20000,
+        nop: 4
+      }
+    ],
+    []
+  );
 
-2. **Risk (Variance):**
-   - Use the covariance matrix of asset returns to calculate portfolio variance.
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-3. **Objective Function:**
-   - Typically, the objective is to maximize the Sharpe Ratio, which is the ratio of expected return to portfolio risk (standard deviation).
+  const handleEdit = (user) => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
 
-### Step 5: Implement Optimization Algorithm
+  const handleSave = (updatedUser) => {
+    setAllUsers(allUsers.map(user => (user.userid === selectedUser.userid ? { ...user, ...updatedUser } : user)));
+    setIsModalOpen(false);
+  };
 
-1. **Constraints:**
-   - Include constraints such as budget (sum of allocations = 1), minimum and maximum allocations, sector exposure, etc.
+  const handleRowClick = (user) => {
+    navigate(`/admin/users/${user.userid}`);
+  };
 
-2. **Optimization Techniques:**
-   - Use Python libraries like `cvxpy`, `SciPy`, or TensorFlow for optimization.
+  const columns = React.useMemo(
+    () => [
+      { Header: 'Name', accessor: 'name' },
+      { Header: 'Email', accessor: 'email' },
+      { Header: 'Total Invested', accessor: 'invested' },
+      { Header: 'Total Worth', accessor: 'worth' },
+      { Header: 'Profit/Loss', accessor: 'profitLoss' },
+      { Header: 'No. of Portfolios', accessor: 'nop' },
+      {
+        Header: 'Actions',
+        accessor: 'actions',
+        Cell: ({ row }) => (
+          <div className="flex space-x-2">
+            <button onClick={() => handleEdit(row.original)} className="bg-blue-500 text-white px-2 py-1 rounded">
+              Edit
+            </button>
+          </div>
+        )
+      }
+    ],
+    []
+  );
 
-Here is a basic example using `cvxpy`:
+  const {
+    getTableProps,
+    getTableBodyProps,
+    headerGroups,
+    rows,
+    prepareRow,
+    state,
+    setGlobalFilter
+  } = useTable(
+    { columns, data: allUsers.length ? allUsers : initialData },
+    useGlobalFilter,
+    useSortBy
+  );
 
-```python
-import numpy as np
-import pandas as pd
-import cvxpy as cp
+  const { globalFilter } = state;
 
-# Sample data: Replace with your actual historical returns data
-returns = np.random.randn(100, 4)  # 100 days of returns for 4 assets
+  return (
+    <div className="container mx-auto p-6 bg-white rounded-lg shadow relative">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Users</h2>
+        <button onClick={() => navigate('/editstocks')} className="bg-blue-500 text-white px-4 py-2 rounded-lg">
+          Edit Stocks
+        </button>
+      </div>
+      <GlobalFilter globalFilter={globalFilter} setGlobalFilter={setGlobalFilter} />
+      <div className="overflow-x-auto">
+        <table {...getTableProps()} className="min-w-full bg-white">
+          <thead>
+            {headerGroups.map(headerGroup => (
+              <tr {...headerGroup.getHeaderGroupProps()}>
+                {headerGroup.headers.map(column => (
+                  <th
+                    {...column.getHeaderProps(column.getSortByToggleProps())}
+                    className="px-6 py-3 border-b-2 border-gray-300 bg-gray-100 text-left text-xs leading-4 font-medium text-gray-600 uppercase tracking-wider"
+                  >
+                    {column.render('Header')}
+                    <span>
+                      {column.isSorted
+                        ? column.isSortedDesc
+                          ? ' ▼'
+                          : ' ▲'
+                        : ''}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody {...getTableBodyProps()}>
+            {rows.map(row => {
+              prepareRow(row);
+              return (
+                <tr
+                  {...row.getRowProps()}
+                  className="hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handleRowClick(row.original)}
+                >
+                  {row.cells.map(cell => (
+                    <td
+                      {...cell.getCellProps()}
+                      className="px-6 py-4 whitespace-no-wrap border-b border-gray-300"
+                    >
+                      {cell.render('Cell')}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {isModalOpen && (
+        <EditUserModal
+          user={selectedUser}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleSave}
+        />
+      )}
+    </div>
+  );
+};
 
-# Expected returns and covariance matrix
-expected_returns = np.mean(returns, axis=0)
-cov_matrix = np.cov(returns, rowvar=False)
-
-# Number of assets
-n_assets = len(expected_returns)
-
-# Portfolio weights variable
-weights = cp.Variable(n_assets)
-
-# Objective function: Maximize Sharpe Ratio
-risk = cp.quad_form(weights, cov_matrix)
-objective = cp.Maximize(expected_returns.T @ weights / cp.sqrt(risk))
-
-# Constraints: weights sum to 1, and 0 <= weights <= 1
-constraints = [cp.sum(weights) == 1, weights >= 0, weights <= 1]
-
-# Problem definition
-prob = cp.Problem(objective, constraints)
-
-# Solve the problem
-prob.solve()
-
-# Optimal weights
-optimal_weights = weights.value
-print("Optimal Weights:", optimal_weights)
+export default Users;
 ```
 
-### Step 6: Back-Testing
+Changes made:
+1. Updated `useTable` hook to use `data` instead of `allUsers`.
+2. Fixed initial data to use unique `userid` values.
+3. Simplified sorted icons to use text characters '▼' and '▲'.
 
-1. **Historical Testing:**
-   - Implement a back-testing strategy to evaluate the performance of the optimized portfolio using historical data.
-   - Calculate performance metrics such as cumulative return, volatility, Sharpe Ratio, etc.
-
-### Step 7: Monitoring and Rebalancing
-
-1. **Continuous Monitoring:**
-   - Regularly monitor the performance of the portfolio.
-   - Compare the actual performance with the expected performance.
-
-2. **Rebalancing:**
-   - Periodically rebalance the portfolio to maintain the desired allocation and risk profile.
-
-### Data Challenges and Solutions
-
-1. **Training Data:**
-   - Ensure you have sufficient historical data.
-   - Use data augmentation techniques if necessary.
-
-2. **Data Quality:**
-   - Implement data cleaning and preprocessing steps to ensure high-quality data input.
-
-3. **Handling Rare Events:**
-   - Consider stress testing and scenario analysis to understand the impact of rare events (black swans).
-
-### Additional Resources
-
-1. **Books:**
-   - "Python for Finance" by Yves Hilpisch
-   - "Machine Learning for Asset Managers" by Marcos López de Prado
-
-2. **Courses:**
-   - Coursera, edX, and Udacity offer courses on financial analysis, machine learning, and portfolio optimization.
-
-By following these steps and leveraging the appropriate tools and techniques, you'll be able to design and implement a robust portfolio optimization algorithm.
+These changes should help ensure the table displays data correctly.
