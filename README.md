@@ -1,214 +1,243 @@
-There are a few issues in your code that might be causing the table to not display any data. Here are the steps to fix the errors:
+Let's fix your code with the following steps:
 
-1. **Change `allUsers` to `data` in `useTable` Hook:** The `useTable` hook expects the `data` property instead of `allUsers`.
+1. **Correct the API response structure**: Ensure the API response is correctly mapped to the state.
+2. **Fix `useTable` Hook**: Correctly pass `data` to the `useTable` hook.
+3. **Update Columns and Data**: Ensure columns and data structure match the expected data.
+4. **Add a Key Prop to Loop Elements**: Add a key prop to `map` functions in `React`.
 
-2. **Replace duplicate user IDs in initial data:** The initial data contains duplicate `userid` values. Each user should have a unique `userid`.
-
-3. **Fix the display issue for sorted icons:** The sorted icons are using special characters that might not render properly. Use simpler text or icons.
-
-4. **Ensure that data is being correctly fetched:** Ensure that the `allUsers` state is correctly populated from the API.
-
-Here's the corrected version of your code:
+Here’s the fixed version of your code:
 
 ```javascript
 import React, { useEffect, useState } from 'react';
-import { useTable, useSortBy, useGlobalFilter } from 'react-table';
-import { useNavigate } from 'react-router-dom';
-import EditUserModal from '../components/EditUserModal';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useTable } from 'react-table';
 
-const GlobalFilter = ({ globalFilter, setGlobalFilter }) => {
-  return (
-    <span>
-      Search:{' '}
-      <input
-        value={globalFilter || ''}
-        onChange={e => setGlobalFilter(e.target.value || undefined)}
-        placeholder="Search by name"
-        className="p-2 mb-4 border border-gray-300 rounded-lg"
-      />
-    </span>
-  );
-};
+const UserDetailPage = () => {
+    const { userId } = useParams();
+    const navigate = useNavigate();
 
-const Users = () => {
-  const [allUsers, setAllUsers] = useState([]);
-  const navigate = useNavigate();
+    const [portfolios, setPortfolios] = useState([]);
+    const [selectedPortfolio, setSelectedPortfolio] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    const userData = async () => {
-      try {
-        const res = await fetch(`${import.meta.env?.VITE_BACKEND_URL}/admin/users`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'accesstoken': sessionStorage.getItem('accessToken')
-          }
-        });
-        const d = await res.json();
-        setAllUsers(d);
-      } catch (error) {
-        alert("error while admin users");
-        console.log(error);
-      }
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const res = await fetch(`${import.meta.env?.VITE_BACKEND_URL}/admin/user/${userId}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'accesstoken': sessionStorage.getItem('accessToken')
+                    }
+                });
+                const data = await res.json();
+                setUser(data);
+                setPortfolios(data.portfolios);
+            } catch (error) {
+                alert("Error fetching user data");
+                console.log(error);
+            }
+        };
+        fetchUserData();
+    }, [userId]);
+
+    const handleEdit = (portfolio) => {
+        setSelectedPortfolio(portfolio);
+        setIsModalOpen(true);
     };
 
-    userData();
-  }, []);
+    const handleSave = (updatedPortfolio) => {
+        setPortfolios(portfolios.map(portfolio => (portfolio.id === selectedPortfolio.id ? { ...portfolio, ...updatedPortfolio } : portfolio)));
+        setIsModalOpen(false);
+    };
 
-  const initialData = React.useMemo(
-    () => [
-      {
-        userid: 1,
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-        dob: '1980-01-01',
-        invested: 50000,
-        worth: 70000,
-        profitLoss: 20000,
-        nop: 3
-      },
-      {
-        userid: 2,
-        name: 'Jane Doe',
-        email: 'jane.doe@example.com',
-        dob: '1985-01-01',
-        invested: 60000,
-        worth: 80000,
-        profitLoss: 20000,
-        nop: 4
-      }
-    ],
-    []
-  );
+    const columns = React.useMemo(
+        () => [
+            { Header: 'Name', accessor: 'name' },
+            { Header: 'Risk Appetite', accessor: 'riskAppetite', Cell: ({ value }) => `${value}%` },
+            { Header: 'Capital', accessor: 'capital' },
+            { Header: 'Sector Allocation', accessor: 'allocation.sectors', Cell: ({ value }) => JSON.stringify(value) },
+            { Header: 'Stock Allocation', accessor: 'allocation.stocks', Cell: ({ value }) => JSON.stringify(value) },
+            {
+                Header: 'Actions',
+                accessor: 'actions',
+                Cell: ({ row }) => (
+                    <div className="flex space-x-2">
+                        <button onClick={() => handleEdit(row.original)} className="bg-blue-500 text-white px-2 py-1 rounded">
+                            Edit
+                        </button>
+                    </div>
+                )
+            }
+        ],
+        []
+    );
 
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+    const {
+        getTableProps,
+        getTableBodyProps,
+        headerGroups,
+        rows,
+        prepareRow
+    } = useTable({ columns, data: portfolios });
 
-  const handleEdit = (user) => {
-    setSelectedUser(user);
-    setIsModalOpen(true);
-  };
-
-  const handleSave = (updatedUser) => {
-    setAllUsers(allUsers.map(user => (user.userid === selectedUser.userid ? { ...user, ...updatedUser } : user)));
-    setIsModalOpen(false);
-  };
-
-  const handleRowClick = (user) => {
-    navigate(`/admin/users/${user.userid}`);
-  };
-
-  const columns = React.useMemo(
-    () => [
-      { Header: 'Name', accessor: 'name' },
-      { Header: 'Email', accessor: 'email' },
-      { Header: 'Total Invested', accessor: 'invested' },
-      { Header: 'Total Worth', accessor: 'worth' },
-      { Header: 'Profit/Loss', accessor: 'profitLoss' },
-      { Header: 'No. of Portfolios', accessor: 'nop' },
-      {
-        Header: 'Actions',
-        accessor: 'actions',
-        Cell: ({ row }) => (
-          <div className="flex space-x-2">
-            <button onClick={() => handleEdit(row.original)} className="bg-blue-500 text-white px-2 py-1 rounded">
-              Edit
-            </button>
-          </div>
-        )
-      }
-    ],
-    []
-  );
-
-  const {
-    getTableProps,
-    getTableBodyProps,
-    headerGroups,
-    rows,
-    prepareRow,
-    state,
-    setGlobalFilter
-  } = useTable(
-    { columns, data: allUsers.length ? allUsers : initialData },
-    useGlobalFilter,
-    useSortBy
-  );
-
-  const { globalFilter } = state;
-
-  return (
-    <div className="container mx-auto p-6 bg-white rounded-lg shadow relative">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Users</h2>
-        <button onClick={() => navigate('/editstocks')} className="bg-blue-500 text-white px-4 py-2 rounded-lg">
-          Edit Stocks
-        </button>
-      </div>
-      <GlobalFilter globalFilter={globalFilter} setGlobalFilter={setGlobalFilter} />
-      <div className="overflow-x-auto">
-        <table {...getTableProps()} className="min-w-full bg-white">
-          <thead>
-            {headerGroups.map(headerGroup => (
-              <tr {...headerGroup.getHeaderGroupProps()}>
-                {headerGroup.headers.map(column => (
-                  <th
-                    {...column.getHeaderProps(column.getSortByToggleProps())}
-                    className="px-6 py-3 border-b-2 border-gray-300 bg-gray-100 text-left text-xs leading-4 font-medium text-gray-600 uppercase tracking-wider"
-                  >
-                    {column.render('Header')}
-                    <span>
-                      {column.isSorted
-                        ? column.isSortedDesc
-                          ? ' ▼'
-                          : ' ▲'
-                        : ''}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody {...getTableBodyProps()}>
-            {rows.map(row => {
-              prepareRow(row);
-              return (
-                <tr
-                  {...row.getRowProps()}
-                  className="hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handleRowClick(row.original)}
-                >
-                  {row.cells.map(cell => (
-                    <td
-                      {...cell.getCellProps()}
-                      className="px-6 py-4 whitespace-no-wrap border-b border-gray-300"
-                    >
-                      {cell.render('Cell')}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {isModalOpen && (
-        <EditUserModal
-          user={selectedUser}
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSave={handleSave}
-        />
-      )}
-    </div>
-  );
+    return (
+        <div className="container mx-auto p-6 bg-white rounded-lg shadow">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">{user ? `${user.name}'s Portfolios` : 'Loading...'}</h2>
+                <div className="container mx-auto p-6">
+                    <div className="flex justify-end">
+                        <button onClick={() => navigate('/editstocks')} className="bg-blue-500 text-white px-4 py-2 mr-10 rounded-lg">
+                            Edit Stocks
+                        </button>
+                        <button onClick={() => navigate('/editstocks')} className="bg-blue-500 text-white px-4 py-2 rounded-lg">
+                            Go to User Portfolio Dashboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div className="overflow-x-auto">
+                <table {...getTableProps()} className="min-w-full bg-white">
+                    <thead>
+                        {headerGroups.map((headerGroup, index) => (
+                            <tr {...headerGroup.getHeaderGroupProps()} key={index}>
+                                {headerGroup.headers.map((column, colIndex) => (
+                                    <th
+                                        {...column.getHeaderProps()}
+                                        key={colIndex}
+                                        className="px-6 py-3 border-b-2 border-gray-300 bg-gray-100 text-left text-xs leading-4 font-medium text-gray-600 uppercase tracking-wider"
+                                    >
+                                        {column.render('Header')}
+                                    </th>
+                                ))}
+                            </tr>
+                        ))}
+                    </thead>
+                    <tbody {...getTableBodyProps()}>
+                        {rows.map((row, rowIndex) => {
+                            prepareRow(row);
+                            return (
+                                <tr {...row.getRowProps()} key={rowIndex} className="hover:bg-gray-100">
+                                    {row.cells.map((cell, cellIndex) => (
+                                        <td
+                                            {...cell.getCellProps()}
+                                            key={cellIndex}
+                                            className="px-6 py-4 whitespace-no-wrap border-b border-gray-300"
+                                        >
+                                            {cell.render('Cell')}
+                                        </td>
+                                    ))}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            {isModalOpen && (
+                <EditPortfolioModal
+                    portfolio={selectedPortfolio}
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSave={handleSave}
+                />
+            )}
+        </div>
+    );
 };
 
-export default Users;
+const EditPortfolioModal = ({ portfolio, isOpen, onClose, onSave }) => {
+    const [formData, setFormData] = useState({
+        name: portfolio ? portfolio.name : '',
+        riskAppetite: portfolio ? portfolio.riskAppetite : 0,
+        capital: portfolio ? portfolio.capital : 0
+    });
+
+    useEffect(() => {
+        if (portfolio) {
+            setFormData({
+                name: portfolio.name,
+                riskAppetite: portfolio.riskAppetite,
+                capital: portfolio.capital
+            });
+        }
+    }, [portfolio]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+    };
+
+    const handleSliderChange = (e) => {
+        setFormData({ ...formData, riskAppetite: e.target.value });
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(formData);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+            <div className="absolute inset-0 bg-gray-600 opacity-50" onClick={onClose}></div>
+            <div className="bg-white p-6 rounded-lg shadow-lg z-10 w-full max-w-md">
+                <h2 className="text-xl font-semibold mb-4">Edit Portfolio</h2>
+                <form onSubmit={handleSubmit}>
+                    <div className="mb-4">
+                        <label className="block text-gray-700">Name</label>
+                        <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border rounded-lg"
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-gray-700">Risk Appetite</label>
+                        <input
+                            type="range"
+                            name="riskAppetite"
+                            min="0"
+                            max="100"
+                            value={formData.riskAppetite}
+                            onChange={handleSliderChange}
+                            className="w-full"
+                        />
+                        <div className="text-center">{formData.riskAppetite}%</div>
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-gray-700">Capital</label>
+                        <input
+                            type="number"
+                            name="capital"
+                            value={formData.capital}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border rounded-lg"
+                        />
+                    </div>
+                    <div className="flex justify-end">
+                        <button type="button" onClick={onClose} className="bg-gray-500 text-white px-4 py-2 rounded-lg mr-2">
+                            Cancel
+                        </button>
+                        <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded-lg">
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default UserDetailPage;
 ```
 
 Changes made:
-1. Updated `useTable` hook to use `data` instead of `allUsers`.
-2. Fixed initial data to use unique `userid` values.
-3. Simplified sorted icons to use text characters '▼' and '▲'.
+1. **Added unique `key` properties** for elements inside `map` functions.
+2. **Adjusted the API data handling** to ensure the user and portfolios are set correctly from the response.
+3. **Passed `data` correctly** to the `useTable` hook.
+4. **Updated the modal form to initialize correctly** with `portfolio` data.
 
-These changes should help ensure the table displays data correctly.
+These changes should fix the issues with your component and ensure the data is displayed and handled correctly.
